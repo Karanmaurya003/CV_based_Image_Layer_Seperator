@@ -1,0 +1,158 @@
+<!doctype html><html><head><meta charset='utf-8'><title>Layer Studio</title>
+<style>
+body{margin:0;display:flex;height:100vh;font-family:system-ui;background:#1e1e1e;color:#ddd}
+.panel{width:240px;padding:10px;overflow:auto;background:#252526;box-sizing:border-box}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto}
+canvas{max-width:100%;max-height:96vh;cursor:crosshair;box-shadow:0 0 0 1px #444}
+button,select,input[type=text]{width:100%;margin:3px 0;padding:6px;box-sizing:border-box}
+.layer{padding:6px;border:1px solid #444;margin:4px 0;cursor:pointer;display:flex;gap:6px;align-items:center}
+.layer.sel{border-color:#4da3ff}.layer span{flex:1}
+#msg{font-size:12px;color:#9cdcfe;min-height:40px;margin-top:8px}
+</style></head><body>
+<div class='panel'>
+ <h3>Layer Studio</h3>
+ <input type='file' id='file' accept='image/*'>
+ <label><input type='checkbox' id='hover'> Hover preview</label>
+ <button id='clear'>Clear points</button>
+ <input type='text' id='name' placeholder='Layer name'>
+ <button id='commit'>Commit selection as layer</button>
+ <button id='setshadow'>Use selection as shadow of selected layer</button>
+ <button id='bgbtn'>Build background</button>
+ <select id='view'>
+  <option value='original'>View: original + selection</option>
+  <option value='layers'>View: all layers</option>
+  <option value='isolate'>View: isolate selected layer</option>
+  <option value='diff'>View: recomposition diff</option>
+ </select>
+ <label><input type='checkbox' id='showsh' checked> Show shadow in isolate</label>
+ <button id='check'>Check recomposition</button>
+ <button id='export'>Export ZIP (ORA + PNGs)</button>
+ <div id='msg'>Left click = add to object. Right click = remove from object.</div>
+</div>
+<div id='stage'><canvas id='cv'></canvas></div>
+<div class='panel' id='layers'></div>
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+let S = {sid: null, img: null, w: 0, h: 0, pts: [], ov: null, layers: [], sel: null, bg: null, diff: null};
+let seq = 0;
+const msg = t => $('msg').textContent = t;
+const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
+const post = (u, b) => fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)})
+  .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }));
+const pos = e => { const b = cv.getBoundingClientRect(); return {x: (e.clientX - b.left) * cv.width / b.width, y: (e.clientY - b.top) * cv.height / b.height}; };
+
+$('file').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('file', f);
+  msg('Uploading and computing image embedding...');
+  const r = await (await fetch('/api/upload', {method: 'POST', body: fd})).json();
+  S = {sid: r.sid, w: r.w, h: r.h, pts: [], ov: null, layers: [], sel: null, bg: null, diff: null, img: null};
+  S.img = await load('/api/original/' + r.sid);
+  cv.width = r.w; cv.height = r.h; msg('Ready (embedding took ' + r.embed_s + 's). Click an object.');
+  draw(); renderLayers();
+};
+
+async function segment(pts) {
+  const my = ++seq;
+  const r = await post('/api/segment', {sid: S.sid, points: pts});
+  if (my !== seq) return;
+  const m = await load(r.mask);
+  const o = document.createElement('canvas'); o.width = S.w; o.height = S.h;
+  const c = o.getContext('2d'); c.drawImage(m, 0, 0);
+  const d = c.getImageData(0, 0, S.w, S.h);
+  for (let i = 0; i < d.data.length; i += 4) {
+    const on = d.data[i] > 127;
+    d.data[i] = 255; d.data[i + 1] = 60; d.data[i + 2] = 60; d.data[i + 3] = on ? 120 : 0;
+  }
+  c.putImageData(d, 0, 0); S.ov = o; draw();
+}
+
+cv.onmousedown = e => {
+  if (!S.sid) return; e.preventDefault();
+  const p = pos(e); S.pts.push({x: p.x, y: p.y, l: e.button === 2 ? 0 : 1});
+  $('view').value = 'original';
+  segment(S.pts).catch(err => msg(err.message));
+};
+cv.oncontextmenu = e => false;
+let tHover = 0;
+cv.onmousemove = e => {
+  if (!$('hover').checked || S.pts.length || !S.sid) return;
+  const n = Date.now(); if (n - tHover < 150) return; tHover = n;
+  const p = pos(e); segment([{x: p.x, y: p.y, l: 1}]).catch(() => {});
+};
+$('clear').onclick = () => { S.pts = []; S.ov = null; seq++; draw(); };
+
+$('commit').onclick = async () => {
+  try {
+    msg('Refining edges and finding shadow (can take several seconds)...');
+    const r = await post('/api/commit', {sid: S.sid, name: $('name').value || 'object'});
+    const [ob, sh] = await Promise.all([load(r.object), load(r.shadow)]);
+    S.layers.push({id: r.id, name: r.name, vis: true, ob, sh});
+    S.sel = r.id; S.pts = []; S.ov = null; S.bg = null;
+    renderLayers(); draw(); msg('Layer added. Check isolate view; fix the shadow manually if needed.');
+  } catch (err) { msg(err.message); }
+};
+
+$('setshadow').onclick = async () => {
+  if (S.sel == null) return msg('Select a layer first.');
+  try {
+    const r = await post('/api/set_shadow', {sid: S.sid, lid: S.sel});
+    S.layers.find(l => l.id === S.sel).sh = await load(r.shadow);
+    S.pts = []; S.ov = null; S.bg = null; $('view').value = 'isolate'; draw(); msg('Shadow updated.');
+  } catch (err) { msg(err.message); }
+};
+
+$('bgbtn').onclick = async () => {
+  msg('Inpainting background...');
+  const r = await post('/api/background', {sid: S.sid, lid: 0});
+  S.bg = await load(r.url); $('view').value = 'layers'; draw(); msg('Background built.');
+};
+
+$('check').onclick = async () => {
+  msg('Checking...');
+  const r = await (await fetch('/api/check/' + S.sid)).json();
+  S.diff = await load(r.diff);
+  msg('Mean error ' + r.mean + '/255, 99th percentile ' + r.p99 + '/255. Diff view is amplified 8x.');
+};
+$('export').onclick = () => { location.href = '/api/export/' + S.sid; };
+$('view').onchange = draw;
+$('showsh').onchange = draw;
+
+function checker() {
+  const s = 16;
+  for (let y = 0; y < S.h; y += s) for (let x = 0; x < S.w; x += s) {
+    ctx.fillStyle = ((x + y) / s) % 2 ? '#bbb' : '#fff'; ctx.fillRect(x, y, s, s);
+  }
+}
+function draw() {
+  if (!S.img) return;
+  ctx.clearRect(0, 0, S.w, S.h);
+  const v = $('view').value;
+  if (v === 'original') {
+    ctx.drawImage(S.img, 0, 0);
+    if (S.ov) ctx.drawImage(S.ov, 0, 0);
+    S.pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fillStyle = p.l ? '#0f0' : '#f00'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke(); });
+  } else if (v === 'layers') {
+    checker(); if (S.bg) ctx.drawImage(S.bg, 0, 0);
+    S.layers.filter(l => l.vis).forEach(l => { ctx.drawImage(l.sh, 0, 0); ctx.drawImage(l.ob, 0, 0); });
+  } else if (v === 'isolate') {
+    checker(); const l = S.layers.find(l => l.id === S.sel);
+    if (l) { if ($('showsh').checked) ctx.drawImage(l.sh, 0, 0); ctx.drawImage(l.ob, 0, 0); }
+  } else if (v === 'diff' && S.diff) ctx.drawImage(S.diff, 0, 0);
+}
+function renderLayers() {
+  const box = $('layers'); box.innerHTML = '<h3>Layers</h3>';
+  S.layers.forEach(l => {
+    const d = document.createElement('div'); d.className = 'layer' + (l.id === S.sel ? ' sel' : '');
+    d.innerHTML = `<input type='checkbox' ${l.vis ? 'checked' : ''}><span>${l.name}</span><button style='width:auto'>x</button>`;
+    d.onclick = () => { S.sel = l.id; renderLayers(); draw(); };
+    d.querySelector('input').onclick = e => { e.stopPropagation(); l.vis = e.target.checked; draw(); };
+    d.querySelector('button').onclick = async e => {
+      e.stopPropagation(); await fetch(`/api/layer/${S.sid}/${l.id}`, {method: 'DELETE'});
+      S.layers = S.layers.filter(x => x.id !== l.id); S.bg = null; if (S.sel === l.id) S.sel = null; renderLayers(); draw();
+    };
+    box.appendChild(d);
+  });
+}
+</script></body></html>
