@@ -9,3 +9,7 @@ uvicorn[standard]
 python-multipart
 pymatting
 simple-lama-inpainting
+# optional, for Stable Diffusion generative fill:
+diffusers
+transformers
+accelerate

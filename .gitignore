@@ -1,0 +1,26 @@
+# Python environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Downloaded model checkpoints
+models/*.pth
+
+# Operating system files
+.DS_Store
+Thumbs.db

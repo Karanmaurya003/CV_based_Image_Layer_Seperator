@@ -34,7 +34,16 @@ def ensure_bg(s):
         hole = union_masks(s).astype(bool)
         for l in s['layers']:
             hole |= l['shadow'] > 0.02
-        s['bg'] = P.inpaint_background(s['img'], hole)
+        s['note'] = ''
+        if s.get('engine') == 'sd':
+            try:
+                s['bg'] = P.generative_fill(s['img'], hole, s.get('prompt', ''))
+            except Exception as e:
+                print('Stable Diffusion fill failed, using LaMa:', e)
+                s['note'] = 'Stable Diffusion failed (' + str(e)[:120] + '). Used LaMa instead.'
+                s['bg'] = P.inpaint_background(s['img'], hole)
+        else:
+            s['bg'] = P.inpaint_background(s['img'], hole)
     return s['bg']
 
 @app.post('/api/upload')
@@ -48,7 +57,8 @@ async def upload(file: UploadFile = File(...)):
         bgr = cv2.resize(bgr, None, fx=k, fy=k, interpolation=cv2.INTER_AREA)
     img = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
     sid = uuid.uuid4().hex[:8]
-    SESS[sid] = dict(img=img, layers=[], current=None, bg=None, next_id=1, diff=None)
+    SESS[sid] = dict(img=img, layers=[], current=None, bg=None, next_id=1, diff=None,
+                    engine='lama', prompt='', note='')
     t = time.time()
     get(sid, embed=True)
     return dict(sid=sid, w=img.shape[1], h=img.shape[0], embed_s=round(time.time() - t, 2))
@@ -135,12 +145,19 @@ def delete_layer(sid: str, lid: int):
     s['bg'] = None
     return dict(ok=True)
 
+class BgReq(BaseModel):
+    sid: str
+    engine: str = 'lama'   # 'lama' (fast) or 'sd' (Stable Diffusion generative fill)
+    prompt: str = ''
+
 @app.post('/api/background')
-def background(r: LidReq):
+def background(r: BgReq):
     s = get(r.sid)
+    s['engine'] = 'sd' if r.engine == 'sd' else 'lama'
+    s['prompt'] = r.prompt
     s['bg'] = None
     ensure_bg(s)
-    return dict(url=f'/api/background/{r.sid}?t={int(time.time() * 1000)}')
+    return dict(url=f'/api/background/{r.sid}?t={int(time.time() * 1000)}', note=s['note'])
 
 @app.get('/api/background/{sid}')
 def background_png(sid: str):

@@ -110,3 +110,54 @@ def build_ora(w, h, layers):
         xml = f'''<?xml version='1.0' encoding='UTF-8'?><image version='0.0.3' w='{w}' h='{h}'><stack>{body}</stack></image>'''
         z.writestr('stack.xml', xml)
     return buf.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# Generative fill (Stable Diffusion inpainting). Optional: needs
+#   pip install diffusers transformers accelerate
+# First use downloads ~4 GB from Hugging Face. Fast on CUDA, slow on CPU.
+# ---------------------------------------------------------------------------
+SD_MODEL = 'stable-diffusion-v1-5/stable-diffusion-inpainting'
+_sd = None
+
+def generative_fill(img_rgb, hole, prompt='', steps=30, guidance=7.5, seed=0):
+    """Fill `hole` with AI-generated content. Works on a square crop around the
+    hole (resized to 512) and pastes back only the hole area with a soft edge,
+    so every pixel outside the hole stays exactly as in the original."""
+    global _sd
+    import torch
+    if _sd is None:
+        from diffusers import StableDiffusionInpaintPipeline
+        dev = 'cuda' if torch.cuda.is_available() else 'cpu'
+        dtype = torch.float16 if dev == 'cuda' else torch.float32
+        _sd = StableDiffusionInpaintPipeline.from_pretrained(
+            SD_MODEL, torch_dtype=dtype, safety_checker=None, requires_safety_checker=False).to(dev)
+    hole = cv2.dilate((hole > 0).astype(np.uint8) * 255, np.ones((11, 11), np.uint8))
+    ys, xs = np.where(hole > 0)
+    if len(ys) == 0:
+        return img_rgb.copy()
+    h, w = hole.shape
+    side = int(max(ys.max() - ys.min() + 1, xs.max() - xs.min() + 1) * 1.6)
+    side = min(max(side, 256), min(h, w))
+    cy, cx = (ys.min() + ys.max()) // 2, (xs.min() + xs.max()) // 2
+    y0 = int(np.clip(cy - side // 2, 0, h - side))
+    x0 = int(np.clip(cx - side // 2, 0, w - side))
+    crop = img_rgb[y0:y0 + side, x0:x0 + side]
+    m = hole[y0:y0 + side, x0:x0 + side]
+    S = 512
+    interp = cv2.INTER_AREA if side > S else cv2.INTER_CUBIC
+    gen = torch.Generator(device=_sd.device).manual_seed(seed)
+    out = _sd(
+        prompt=prompt.strip() or 'empty background, seamless natural continuation of the surrounding scene',
+        negative_prompt='person, people, car, object, text, watermark, logo, blurry, border',
+        image=Image.fromarray(cv2.resize(crop, (S, S), interpolation=interp)),
+        mask_image=Image.fromarray(cv2.resize(m, (S, S), interpolation=cv2.INTER_NEAREST)),
+        height=S, width=S, num_inference_steps=steps, guidance_scale=guidance, generator=gen,
+    ).images[0]
+    out = cv2.resize(np.array(out), (side, side), interpolation=cv2.INTER_CUBIC).astype(np.float32)
+    mf = (m > 0).astype(np.float32)
+    soft = np.maximum(cv2.GaussianBlur(mf, (0, 0), 3), mf)[..., None]
+    res = img_rgb.copy()
+    reg = res[y0:y0 + side, x0:x0 + side].astype(np.float32)
+    res[y0:y0 + side, x0:x0 + side] = np.clip(out * soft + reg * (1 - soft), 0, 255).astype(np.uint8)
+    return res

@@ -2,8 +2,10 @@
 <style>
 body{margin:0;display:flex;height:100vh;font-family:system-ui;background:#1e1e1e;color:#ddd}
 .panel{width:240px;padding:10px;overflow:auto;background:#252526;box-sizing:border-box}
-#stage{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto}
-canvas{max-width:100%;max-height:96vh;cursor:crosshair;box-shadow:0 0 0 1px #444}
+#stage{flex:1;position:relative;overflow:hidden;background:#161616}
+canvas{position:absolute;left:0;top:0;transform-origin:0 0;cursor:crosshair;box-shadow:0 0 0 1px #444}
+.row{display:flex;gap:4px}.row button{width:auto;flex:1}
+#zl{font-size:12px;color:#aaa;text-align:center}
 button,select,input[type=text]{width:100%;margin:3px 0;padding:6px;box-sizing:border-box}
 .layer{padding:6px;border:1px solid #444;margin:4px 0;cursor:pointer;display:flex;gap:6px;align-items:center}
 .layer.sel{border-color:#4da3ff}.layer span{flex:1}
@@ -12,11 +14,18 @@ button,select,input[type=text]{width:100%;margin:3px 0;padding:6px;box-sizing:bo
 <div class='panel'>
  <h3>Layer Studio</h3>
  <input type='file' id='file' accept='image/*'>
+ <div class='row'><button id='zin'>+</button><button id='zout'>-</button><button id='zfit'>Fit</button><button id='z100'>100%</button></div>
+ <div id='zl'>Zoom: wheel. Pan: middle-drag or Space+drag.</div>
  <label><input type='checkbox' id='hover'> Hover preview</label>
  <button id='clear'>Clear points</button>
  <input type='text' id='name' placeholder='Layer name'>
  <button id='commit'>Commit selection as layer</button>
  <button id='setshadow'>Use selection as shadow of selected layer</button>
+ <select id='engine'>
+  <option value='lama'>Fill: LaMa (fast, no prompt)</option>
+  <option value='sd'>Fill: Stable Diffusion (AI generate)</option>
+ </select>
+ <input type='text' id='prompt' placeholder='Fill prompt (optional), e.g. empty asphalt road'>
  <button id='bgbtn'>Build background</button>
  <select id='view'>
   <option value='original'>View: original + selection</option>
@@ -33,9 +42,46 @@ button,select,input[type=text]{width:100%;margin:3px 0;padding:6px;box-sizing:bo
 <div class='panel' id='layers'></div>
 <script>
 const $ = id => document.getElementById(id);
-const cv = $('cv'), ctx = cv.getContext('2d');
+const cv = $('cv'), ctx = cv.getContext('2d'), stage = $('stage');
 let S = {sid: null, img: null, w: 0, h: 0, pts: [], ov: null, layers: [], sel: null, bg: null, diff: null};
 let seq = 0;
+const V = {k: 1, x: 0, y: 0};   // view: CSS px per image px, and offset in stage px
+let space = false, pan = null;
+function applyView() {
+  cv.style.width = S.w + 'px'; cv.style.height = S.h + 'px';
+  cv.style.transform = `translate(${V.x}px,${V.y}px) scale(${V.k})`;
+  cv.style.imageRendering = V.k >= 4 ? 'pixelated' : 'auto';
+  $('zl').textContent = 'Zoom ' + Math.round(V.k * 100) + '%  (wheel; pan: middle-drag or Space+drag)';
+  if (S.pts.length) draw();
+}
+function fit() {
+  const r = stage.getBoundingClientRect();
+  V.k = Math.min(r.width / S.w, r.height / S.h) * 0.96;
+  V.x = (r.width - S.w * V.k) / 2; V.y = (r.height - S.h * V.k) / 2; applyView();
+}
+function zoomAt(f, sx, sy) {
+  const nk = Math.min(32, Math.max(0.05, V.k * f));
+  const u = (sx - V.x) / V.k, v = (sy - V.y) / V.k;
+  V.k = nk; V.x = sx - u * nk; V.y = sy - v * nk; applyView();
+}
+function zoomCenter(f) { const r = stage.getBoundingClientRect(); zoomAt(f, r.width / 2, r.height / 2); }
+stage.addEventListener('wheel', e => {
+  if (!S.sid) return; e.preventDefault();
+  const r = stage.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
+}, {passive: false});
+$('zin').onclick = () => S.sid && zoomCenter(1.25);
+$('zout').onclick = () => S.sid && zoomCenter(0.8);
+$('zfit').onclick = () => S.sid && fit();
+$('z100').onclick = () => S.sid && zoomCenter(1 / V.k);
+addEventListener('keydown', e => {
+  if (e.code === 'Space' && document.activeElement === document.body) { space = true; cv.style.cursor = 'grab'; e.preventDefault(); }
+});
+addEventListener('keyup', e => { if (e.code === 'Space') { space = false; cv.style.cursor = 'crosshair'; } });
+function startPan(e) { pan = {mx: e.clientX, my: e.clientY, x: V.x, y: V.y}; cv.style.cursor = 'grabbing'; }
+stage.onmousedown = e => { if (e.target === stage && S.sid) { e.preventDefault(); startPan(e); } };
+addEventListener('mousemove', e => { if (!pan) return; V.x = pan.x + e.clientX - pan.mx; V.y = pan.y + e.clientY - pan.my; applyView(); });
+addEventListener('mouseup', () => { if (pan) { pan = null; cv.style.cursor = space ? 'grab' : 'crosshair'; } });
 const msg = t => $('msg').textContent = t;
 const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
 const post = (u, b) => fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)})
@@ -49,7 +95,7 @@ $('file').onchange = async e => {
   const r = await (await fetch('/api/upload', {method: 'POST', body: fd})).json();
   S = {sid: r.sid, w: r.w, h: r.h, pts: [], ov: null, layers: [], sel: null, bg: null, diff: null, img: null};
   S.img = await load('/api/original/' + r.sid);
-  cv.width = r.w; cv.height = r.h; msg('Ready (embedding took ' + r.embed_s + 's). Click an object.');
+  cv.width = r.w; cv.height = r.h; fit(); msg('Ready (embedding took ' + r.embed_s + 's). Click an object.');
   draw(); renderLayers();
 };
 
@@ -70,6 +116,8 @@ async function segment(pts) {
 
 cv.onmousedown = e => {
   if (!S.sid) return; e.preventDefault();
+  if (document.activeElement) document.activeElement.blur();
+  if (e.button === 1 || space) return startPan(e);
   const p = pos(e); S.pts.push({x: p.x, y: p.y, l: e.button === 2 ? 0 : 1});
   $('view').value = 'original';
   segment(S.pts).catch(err => msg(err.message));
@@ -77,7 +125,7 @@ cv.onmousedown = e => {
 cv.oncontextmenu = e => false;
 let tHover = 0;
 cv.onmousemove = e => {
-  if (!$('hover').checked || S.pts.length || !S.sid) return;
+  if (!$('hover').checked || S.pts.length || !S.sid || pan || space) return;
   const n = Date.now(); if (n - tHover < 150) return; tHover = n;
   const p = pos(e); segment([{x: p.x, y: p.y, l: 1}]).catch(() => {});
 };
@@ -104,9 +152,12 @@ $('setshadow').onclick = async () => {
 };
 
 $('bgbtn').onclick = async () => {
-  msg('Inpainting background...');
-  const r = await post('/api/background', {sid: S.sid, lid: 0});
-  S.bg = await load(r.url); $('view').value = 'layers'; draw(); msg('Background built.');
+  const sd = $('engine').value === 'sd';
+  msg(sd ? 'Generating background with Stable Diffusion (first run downloads about 4 GB; CPU can take minutes)...' : 'Inpainting background...');
+  try {
+    const r = await post('/api/background', {sid: S.sid, engine: $('engine').value, prompt: $('prompt').value});
+    S.bg = await load(r.url); $('view').value = 'layers'; draw(); msg(r.note || 'Background built.');
+  } catch (err) { msg(err.message); }
 };
 
 $('check').onclick = async () => {
@@ -132,7 +183,7 @@ function draw() {
   if (v === 'original') {
     ctx.drawImage(S.img, 0, 0);
     if (S.ov) ctx.drawImage(S.ov, 0, 0);
-    S.pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, 7); ctx.fillStyle = p.l ? '#0f0' : '#f00'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.stroke(); });
+    S.pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / Math.max(V.k, 0.25), 0, 7); ctx.fillStyle = p.l ? '#0f0' : '#f00'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 / Math.max(V.k, 0.25); ctx.stroke(); });
   } else if (v === 'layers') {
     checker(); if (S.bg) ctx.drawImage(S.bg, 0, 0);
     S.layers.filter(l => l.vis).forEach(l => { ctx.drawImage(l.sh, 0, 0); ctx.drawImage(l.ob, 0, 0); });
