@@ -15,6 +15,7 @@ venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+venv312/
 
 # Outputs and local data
 layers.zip
