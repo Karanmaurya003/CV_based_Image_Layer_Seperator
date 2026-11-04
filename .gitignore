@@ -1,26 +1,29 @@
-# Python environments
+# Model weights: never commit (download them instead, see models/README.md)
+models/*
+!models/.gitkeep
+!models/README.md
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+
+# Python / virtual envs
 venv/
 .venv/
-env/
-ENV/
-
-# Python-generated files
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
 
-# Local environment and logs
-.env
-.env.*
-!.env.example
-*.log
+# Outputs and local data
+layers.zip
+*.ora
+exports/
+uploads/
 
-# Downloaded model checkpoints
-models/*.pth
-
-# Operating system files
+# Editor / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db

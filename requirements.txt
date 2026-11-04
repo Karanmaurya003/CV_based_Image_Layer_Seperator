@@ -13,3 +13,4 @@ simple-lama-inpainting
 diffusers
 transformers
 accelerate
+peft
