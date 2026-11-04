@@ -1,91 +1,237 @@
 <!doctype html><html><head><meta charset='utf-8'><title>Layer Studio</title>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
 <style>
-body{margin:0;display:flex;height:100vh;font-family:system-ui;background:#1e1e1e;color:#ddd}
-.panel{width:240px;padding:10px;overflow:auto;background:#252526;box-sizing:border-box}
-#stage{flex:1;min-width:0;position:relative;overflow:hidden;background:#161616}
-canvas{position:absolute;left:0;top:0;transform-origin:0 0;cursor:crosshair;box-shadow:0 0 0 1px #444}
-.row{display:flex;gap:4px}.row button{width:auto;flex:1}
-#zl{font-size:12px;color:#aaa;text-align:center}
-button,select,input[type=text]{width:100%;margin:3px 0;padding:6px;box-sizing:border-box}
-.layer{padding:6px;border:1px solid #444;margin:4px 0;cursor:pointer;display:flex;gap:6px;align-items:center}
-.layer.sel{border-color:#4da3ff}.layer span{flex:1}
-#warn{display:none;background:#5a1d1d;color:#ffb4b4;font-size:12px;padding:6px;margin:6px 0;border-radius:4px}
-#msg{font-size:12px;color:#9cdcfe;min-height:40px;margin-top:8px}
+:root{--bg:#17181b;--p:#212226;--p2:#2a2c31;--bd:#34363c;--tx:#e7e8ea;--mu:#8d919a;--ac:#4da3ff;--acd:#1f4f87;--dn:#ff6b6b;--wn:#f2b84b;--ok:#4cc38a}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:grid;grid-template-columns:48px 1fr 292px;grid-template-rows:46px 1fr 28px;font:13px system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--tx);overflow:hidden}
+button,select,input[type=text]{font:inherit;color:inherit}
+.ib{width:32px;height:32px;display:inline-grid;place-items:center;border:0;border-radius:7px;background:transparent;cursor:pointer;color:var(--mu);padding:0;flex:none}
+.ib:hover:not(:disabled){background:var(--p2);color:var(--tx)}
+.ib.on{background:var(--acd);color:#fff}.ib:disabled{opacity:.3;cursor:default}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 12px;border:1px solid var(--bd);background:var(--p2);border-radius:7px;cursor:pointer;width:100%}
+.btn:hover{border-color:var(--mu)}.btn.pri{background:var(--ac);border-color:var(--ac);color:#06223f;font-weight:600;width:auto}
+.btn svg.i{width:16px;height:16px}
+#top{grid-column:1/4;display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--p);border-bottom:1px solid var(--bd);position:relative}
+#top b{font-size:14px;margin-right:6px;letter-spacing:.2px}.sep{width:1px;height:20px;background:var(--bd);margin:0 6px}.grow{flex:1}
+.seg{display:flex;background:var(--bg);border-radius:8px;padding:2px;gap:2px}
+.seg button{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:0;border-radius:6px;background:none;color:var(--mu);cursor:pointer}
+.seg button.on{background:var(--p2);color:var(--tx)}.seg button span{display:none}.seg button.on span{display:inline}
+.sw{width:18px;height:18px;border-radius:50%;border:2px solid var(--bd);cursor:pointer;padding:0}.sw.on{border-color:var(--ac)}
+#prog{position:absolute;left:0;bottom:-1px;height:2px;width:100%;background:linear-gradient(90deg,transparent,var(--ac),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:pg 1s linear infinite;display:none}
+@keyframes pg{from{background-position:-40% 0}to{background-position:140% 0}}
+#tools{background:var(--p);border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0}
+#tools hr{width:24px;border:0;border-top:1px solid var(--bd);margin:4px 0}
+#stage{position:relative;overflow:hidden;background:#111214 radial-gradient(#1c1d20 1px,transparent 1px) 0 0/16px 16px;min-width:0}
+canvas{position:absolute;left:0;top:0;transform-origin:0 0;cursor:crosshair;box-shadow:0 0 0 1px #444,0 10px 40px #0008}
+#empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--mu)}
+#empty div{border:2px dashed var(--bd);border-radius:14px;padding:36px 48px;cursor:pointer}#empty div:hover,#stage.dz #empty div{border-color:var(--ac);color:var(--tx)}
+#empty svg{width:40px;height:40px}
+#warn{display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);max-width:70%;background:#4a1d1d;color:#ffb4b4;padding:8px 12px;border-radius:8px;z-index:5;font-size:12px}
+#selbar{display:none;position:absolute;bottom:16px;left:50%;transform:translateX(-50%);align-items:center;gap:6px;padding:6px;background:var(--p);border:1px solid var(--bd);border-radius:12px;box-shadow:0 8px 30px #0009;z-index:4}
+#selbar input,#selbar select,#side input[type=text],#side select{height:30px;background:var(--bg);border:1px solid var(--bd);border-radius:7px;padding:0 8px;outline:0}
+#selbar input{width:140px}#selbar input:focus,#side input:focus{border-color:var(--ac)}#chip{color:var(--mu);padding:0 6px;font-size:12px}
+#side{background:var(--p);border-left:1px solid var(--bd);display:flex;flex-direction:column;min-height:0;overflow:auto}
+.sec{padding:10px 12px;border-bottom:1px solid var(--bd)}.sec h4{margin:0 0 8px;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;color:var(--mu)}
+.sec h4 em{margin-left:auto;font-style:normal;background:var(--bg);border-radius:9px;padding:0 7px}
+#layers{max-height:34vh;overflow:auto;display:flex;flex-direction:column;gap:3px}
+.layer{display:flex;gap:7px;align-items:center;padding:5px;border:1px solid transparent;border-radius:8px;cursor:pointer}
+.layer:hover{background:var(--p2)}.layer.sel{border-color:var(--ac);background:#1d2b3d}.layer.off{opacity:.5}
+.layer .nm{flex:1;min-width:0}.nm b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm small{color:var(--mu);font-size:11px}.nm small.w{color:var(--wn)}
+.layer .acts{display:none;gap:0}.layer:hover .acts,.layer.sel .acts{display:flex}.acts .ib{width:24px;height:24px}.acts svg.i{width:14px;height:14px}
+.ib.arm{background:var(--dn);color:#fff}
+.layer canvas.th{position:static;width:40px;flex:none;background:repeating-conic-gradient(#888 0 25%,#aaa 0 50%) 0 0/10px 10px;border-radius:4px;box-shadow:none;cursor:pointer}
+.none{color:var(--mu);text-align:center;padding:14px 0;font-size:12px}
+.col{display:flex;flex-direction:column;gap:6px}.tg{display:flex;align-items:center;gap:8px;color:var(--tx);cursor:pointer;font-size:12px}.tg input{accent-color:var(--ac)}
+#side select,#side input[type=text]{width:100%}
+#bar{grid-column:1/4;display:flex;align-items:center;gap:8px;padding:0 10px;background:var(--p);border-top:1px solid var(--bd);color:var(--mu);font-size:12px}
+#msg{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9cdcfe}#bar .ib{width:24px;height:24px}#bar .ib svg.i{width:14px;height:14px}#zp{width:44px;text-align:center;color:var(--tx)}
 </style></head><body>
-<div class='panel'>
- <h3>Layer Studio</h3>
- <div id='warn'></div>
- <input type='file' id='file' accept='image/*'>
- <div class='row'><button id='zin'>+</button><button id='zout'>-</button><button id='zfit'>Fit</button><button id='z100'>100%</button></div>
- <div id='zl'>Zoom: wheel. Pan: middle-drag or Space+drag.</div>
- <label><input type='checkbox' id='hover'> Hover preview</label>
- <button id='clear'>Clear points</button>
- <input type='text' id='name' placeholder='Layer name'>
- <select id='kind'>
-  <option value='object'>Layer type: Object</option>
-  <option value='spray'>Layer type: Spray / dust (soft)</option>
- </select>
- <label><input type='checkbox' id='clean' checked> Clean mask on commit</label>
- <label><input type='checkbox' id='zoomsam' checked> Zoom SAM on box (small objects)</label>
- <button id='commit'>Commit selection as layer</button>
- <button id='setshadow'>Use selection as shadow of selected layer</button>
- <select id='engine'>
-  <option value='lama'>Fill: LaMa (fast, no prompt)</option>
-  <option value='sd'>Fill: Stable Diffusion LCM (AI, fast)</option>
- </select>
- <input type='text' id='prompt' placeholder='Fill prompt (optional), e.g. empty asphalt road'>
- <button id='complete'>Complete hidden part of selected layer</button>
- <label><input type='checkbox' id='move'> Move tool (drag selected layer)</label>
- <button id='bgbtn'>Build background</button>
- <select id='view'>
-  <option value='original'>View: original + selection</option>
-  <option value='layers'>View: all layers</option>
-  <option value='isolate'>View: isolate selected layer</option>
-  <option value='diff'>View: recomposition diff</option>
- </select>
- <label><input type='checkbox' id='showsh' checked> Show shadow in isolate</label>
- <select id='bgsel'>
-  <option value='checker'>Preview on: checkerboard</option>
-  <option value='white'>Preview on: white</option>
-  <option value='black'>Preview on: black</option>
- </select>
- <button id='check'>Check recomposition</button>
- <button id='export'>Export ZIP (ORA + PNGs)</button>
- <div id='msg'>Left click = add. Right click = remove. Shift+drag = box. Wheel = zoom.</div>
+<svg width='0' height='0' style='position:absolute'><defs>
+<symbol id='undo' viewBox='0 0 24 24'><path d='M9 14 4 9l5-5'/><path d='M4 9h10.5a5.5 5.5 0 0 1 0 11H11'/></symbol>
+<symbol id='redo' viewBox='0 0 24 24'><path d='m15 14 5-5-5-5'/><path d='M20 9H9.5a5.5 5.5 0 0 0 0 11H13'/></symbol>
+<symbol id='open' viewBox='0 0 24 24'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><path d='m17 8-5-5-5 5'/><path d='M12 3v12'/></symbol>
+<symbol id='dl' viewBox='0 0 24 24'><path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/><path d='m7 10 5 5 5-5'/><path d='M12 15V3'/></symbol>
+<symbol id='pt' viewBox='0 0 24 24'><circle cx='12' cy='12' r='3'/><path d='M12 2v5M12 17v5M2 12h5M17 12h5'/></symbol>
+<symbol id='bx' viewBox='0 0 24 24'><path d='M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1'/></symbol>
+<symbol id='mv' viewBox='0 0 24 24'><path d='m5 9-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20'/></symbol>
+<symbol id='hd' viewBox='0 0 24 24'><path d='M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8'/><path d='M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'/></symbol>
+<symbol id='zap' viewBox='0 0 24 24'><path d='M13 2 3 14h9l-1 8 10-12h-9z'/></symbol>
+<symbol id='eye' viewBox='0 0 24 24'><path d='M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12Z'/><circle cx='12' cy='12' r='3'/></symbol>
+<symbol id='eyeo' viewBox='0 0 24 24'><path d='M9.9 9.9a3 3 0 1 0 4.2 4.2M10.7 5.1A10 10 0 0 1 12 5c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7M6.6 6.6A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20'/></symbol>
+<symbol id='tr' viewBox='0 0 24 24'><path d='M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2'/></symbol>
+<symbol id='up' viewBox='0 0 24 24'><path d='m18 15-6-6-6 6'/></symbol><symbol id='dn' viewBox='0 0 24 24'><path d='m6 9 6 6 6-6'/></symbol>
+<symbol id='ck' viewBox='0 0 24 24'><path d='M20 6 9 17l-5-5'/></symbol>
+<symbol id='x' viewBox='0 0 24 24'><path d='M18 6 6 18M6 6l12 12'/></symbol>
+<symbol id='im' viewBox='0 0 24 24'><rect width='18' height='18' x='3' y='3' rx='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21'/></symbol>
+<symbol id='ly' viewBox='0 0 24 24'><path d='m12 2-9.4 4.2a1 1 0 0 0 0 1.8L12 12l9.4-4a1 1 0 0 0 0-1.8z'/><path d='m22 17.6-10 4.4-10-4.4M22 12.6l-10 4.4-10-4.4'/></symbol>
+<symbol id='iso' viewBox='0 0 24 24'><rect width='18' height='18' x='3' y='3' rx='2' stroke-dasharray='3 3'/><rect width='8' height='8' x='8' y='8' rx='1'/></symbol>
+<symbol id='df' viewBox='0 0 24 24'><path d='M22 12h-4l-3 9L9 3l-3 9H2'/></symbol>
+<symbol id='sp' viewBox='0 0 24 24'><path d='m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z'/></symbol>
+<symbol id='sh' viewBox='0 0 24 24'><circle cx='12' cy='12' r='10'/><path d='M12 18a6 6 0 0 0 0-12z'/></symbol>
+<symbol id='cc' viewBox='0 0 24 24'><path d='M22 11.1V12a10 10 0 1 1-5.9-9.1M9 11l3 3L22 4'/></symbol>
+<symbol id='cmp' viewBox='0 0 24 24'><rect width='18' height='18' x='3' y='3' rx='2'/><path d='M12 3v18'/></symbol>
+<symbol id='zi' viewBox='0 0 24 24'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3M11 8v6M8 11h6'/></symbol>
+<symbol id='zo' viewBox='0 0 24 24'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3M8 11h6'/></symbol>
+<symbol id='fit' viewBox='0 0 24 24'><path d='M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3'/></symbol>
+</defs></svg>
+<div id='top'>
+ <b>Layer Studio</b>
+ <button class='ib' id='open' title='Open image (Ctrl+O)'><svg class='i'><use href='#open'/></svg></button>
+ <span class='sep'></span>
+ <button class='ib' id='undo' title='Undo (Ctrl+Z)' disabled><svg class='i'><use href='#undo'/></svg></button>
+ <button class='ib' id='redo' title='Redo (Ctrl+Shift+Z / Ctrl+Y)' disabled><svg class='i'><use href='#redo'/></svg></button>
+ <span class='grow'></span>
+ <div class='seg' id='views'>
+  <button data-v='original' title='Original + selection (1)'><svg class='i'><use href='#im'/></svg><span>Original</span></button>
+  <button data-v='layers' title='All layers (2)'><svg class='i'><use href='#ly'/></svg><span>Layers</span></button>
+  <button data-v='isolate' title='Isolate selected layer (3)'><svg class='i'><use href='#iso'/></svg><span>Isolate</span></button>
+  <button data-v='diff' title='Recomposition diff (4)'><svg class='i'><use href='#df'/></svg><span>Diff</span></button>
+ </div>
+ <span class='sep'></span>
+ <button class='sw' data-b='checker' title='Checkerboard' style='background:repeating-conic-gradient(#999 0 25%,#fff 0 50%) 0 0/8px 8px'></button>
+ <button class='sw' data-b='white' title='White' style='background:#fff'></button>
+ <button class='sw' data-b='black' title='Black' style='background:#000'></button>
+ <button class='ib' id='peek' title='Hold to compare with original (\)'><svg class='i'><use href='#cmp'/></svg></button>
+ <span class='grow'></span>
+ <button class='btn pri' id='export' title='Export ZIP (ORA + PNGs)'><svg class='i'><use href='#dl'/></svg>Export</button>
+ <div id='prog'></div>
 </div>
-<div id='stage'><canvas id='cv'></canvas></div>
-<div class='panel' id='layers'></div>
+<div id='tools'>
+ <button class='ib' data-t='point' title='Point select (W): click = add, right-click = remove'><svg class='i'><use href='#pt'/></svg></button>
+ <button class='ib' data-t='box' title='Box select (B), or Shift+drag'><svg class='i'><use href='#bx'/></svg></button>
+ <button class='ib' data-t='move' title='Move selected layer (V)'><svg class='i'><use href='#mv'/></svg></button>
+ <button class='ib' data-t='hand' title='Pan (H), or hold Space'><svg class='i'><use href='#hd'/></svg></button>
+ <hr>
+ <button class='ib' id='hbtn' title='Hover preview'><svg class='i'><use href='#zap'/></svg></button>
+ <input type='checkbox' id='hover' hidden><input type='checkbox' id='move' hidden>
+</div>
+<div id='stage'>
+ <canvas id='cv'></canvas>
+ <div id='empty'><div id='drop'><svg class='i'><use href='#open'/></svg><p style='margin:10px 0 0'>Drop an image here or click to open</p></div></div>
+ <div id='warn'></div>
+ <div id='selbar'>
+  <span id='chip'></span>
+  <input type='text' id='name' placeholder='Layer name'>
+  <select id='kind' title='Layer type'><option value='object'>Object</option><option value='spray'>Spray / dust</option></select>
+  <button class='btn pri' id='commit' title='Commit selection as layer (Enter)'><svg class='i'><use href='#ck'/></svg>Add layer</button>
+  <button class='ib' id='clear' title='Clear selection (Esc)'><svg class='i'><use href='#x'/></svg></button>
+ </div>
+</div>
+<div id='side'>
+ <div class='sec'><h4><svg class='i' style='width:14px;height:14px'><use href='#ly'/></svg>Layers<em id='cnt'>0</em></h4><div id='layers'></div>
+  <div class='col' style='margin-top:8px'>
+   <button class='btn' id='setshadow' title='Use the current selection as the shadow of the selected layer'><svg class='i'><use href='#sh'/></svg>Set shadow from selection</button>
+   <button class='btn' id='complete' title='Fill the hidden part of the selected layer'><svg class='i'><use href='#sp'/></svg>Complete hidden part</button>
+  </div></div>
+ <div class='sec'><h4>Background</h4><div class='col'>
+  <select id='engine'><option value='lama'>LaMa (fast, no prompt)</option><option value='sd'>Stable Diffusion LCM (AI)</option></select>
+  <input type='text' id='prompt' placeholder='Fill prompt (optional)'>
+  <button class='btn' id='bgbtn'><svg class='i'><use href='#im'/></svg>Build background</button></div></div>
+ <div class='sec'><h4>Selection options</h4><div class='col'>
+  <label class='tg'><input type='checkbox' id='clean' checked>Clean mask on commit</label>
+  <label class='tg'><input type='checkbox' id='zoomsam' checked>Zoom SAM on box (small objects)</label>
+  <label class='tg'><input type='checkbox' id='showsh' checked>Show shadow in isolate view</label></div></div>
+ <div class='sec'><h4>Quality</h4><button class='btn' id='check'><svg class='i'><use href='#cc'/></svg>Check recomposition</button></div>
+ <select id='view' hidden><option value='original'></option><option value='layers'></option><option value='isolate'></option><option value='diff'></option></select>
+ <select id='bgsel' hidden><option value='checker'></option><option value='white'></option><option value='black'></option></select>
+</div>
+<div id='bar'><span id='msg'>Open an image to start.</span><span id='xy'></span><span class='sep'></span>
+ <button class='ib' id='zout' title='Zoom out (-)'><svg class='i'><use href='#zo'/></svg></button><span id='zp'>100%</span>
+ <button class='ib' id='zin' title='Zoom in (+)'><svg class='i'><use href='#zi'/></svg></button>
+ <button class='ib' id='zfit' title='Fit to screen (F)'><svg class='i'><use href='#fit'/></svg></button>
+ <button class='ib' id='z100' title='Actual size (0)' style='width:auto;padding:0 6px'>1:1</button></div>
+<input type='file' id='file' accept='image/*' hidden>
 <script>
 const $ = id => document.getElementById(id);
 const cv = $('cv'), ctx = cv.getContext('2d'), stage = $('stage');
 let S = {sid: null, img: null, w: 0, h: 0, pts: [], box: null, ov: null, layers: [], sel: null, bg: null, diff: null};
-let seq = 0;
-let autoFit = true;
-const V = {k: 1, x: 0, y: 0};   // view: CSS px per image px, and offset in stage px
+let seq = 0, autoFit = true, tool = 'point', peek = false, nbusy = 0;
+const V = {k: 1, x: 0, y: 0};
 let space = false, pan = null, drag = null, boxDrag = null;
+const icon = n => `<svg class='i'><use href='#${n}'/></svg>`;
+
+/* ---------- status helpers ---------- */
+const msg = t => $('msg').textContent = t;
+const warn = t => { $('warn').textContent = t || ''; $('warn').style.display = t ? 'block' : 'none'; };
+const busy = d => { nbusy = Math.max(0, nbusy + d); $('prog').style.display = nbusy ? 'block' : 'none'; };
+const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
+const post = (u, b) => fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)})
+  .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }));
+const pos = e => { const b = cv.getBoundingClientRect(); return {x: (e.clientX - b.left) * cv.width / b.width, y: (e.clientY - b.top) * cv.height / b.height}; };
+async function work(fn) { busy(1); try { return await fn(); } catch (err) { msg(err.message); } finally { busy(-1); } }
+
+/* ---------- undo / redo ---------- */
+const H = {u: [], r: []};
+function hist() { $('undo').disabled = !H.u.length; $('redo').disabled = !H.r.length; }
+function pushH(a) { H.u.push(a); if (H.u.length > 100) H.u.shift(); H.r = []; hist(); }
+async function stepH(from, to, k) {
+  if (nbusy) return; const a = from.pop(); if (!a) return;
+  await work(() => a[k]()); to.push(a); hist(); msg((k === 'undo' ? 'Undid: ' : 'Redid: ') + a.label);
+}
+const undo = () => stepH(H.u, H.r, 'undo'), redo = () => stepH(H.r, H.u, 'redo');
+const dropHist = l => { H.u = H.u.filter(a => !(a.layers || []).includes(l)); H.r = H.r.filter(a => !(a.layers || []).includes(l)); hist(); };
+const snap = () => ({pts: S.pts.map(p => ({...p})), box: S.box ? [...S.box] : null});
+async function applySel(s) {
+  S.pts = s.pts.map(p => ({...p})); S.box = s.box ? [...s.box] : null; setView('original'); await runSeg();
+}
+function runSeg() {
+  if (!S.pts.length && !S.box) { S.ov = null; seq++; draw(); selUI(); return Promise.resolve(); }
+  selUI(); return segment(S.pts, S.box).catch(err => msg(err.message));
+}
+function selEdit(label, mutate) {
+  const b = snap(); mutate(); const a = snap(); setView('original');
+  pushH({label, undo: () => applySel(b), redo: () => applySel(a)}); runSeg();
+}
+function selUI() {
+  const n = S.pts.length, on = n || S.box || (S.ov && $('hover').checked);
+  $('selbar').style.display = on ? 'flex' : 'none';
+  $('chip').textContent = (n ? n + (n > 1 ? ' points' : ' point') : '') + (n && S.box ? ' + ' : '') + (S.box ? 'box' : '');
+}
+
+/* ---------- view / tools ---------- */
+function setView(v) {
+  $('view').value = v;
+  document.querySelectorAll('#views button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  draw();
+}
+function setBg(b) {
+  $('bgsel').value = b; document.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.b === b)); draw();
+}
+function setTool(t) {
+  tool = t; $('move').checked = t === 'move';
+  document.querySelectorAll('#tools [data-t]').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  cv.style.cursor = t === 'move' ? 'move' : t === 'hand' ? 'grab' : 'crosshair';
+  if (t === 'move' && $('view').value === 'original') { setView('layers'); msg('Move tool: drag the selected layer.'); }
+}
+document.querySelectorAll('#views button').forEach(b => b.onclick = () => setView(b.dataset.v));
+document.querySelectorAll('.sw').forEach(b => b.onclick = () => setBg(b.dataset.b));
+document.querySelectorAll('#tools [data-t]').forEach(b => b.onclick = () => setTool(b.dataset.t));
+$('hbtn').onclick = () => { const h = $('hover'); h.checked = !h.checked; $('hbtn').classList.toggle('on', h.checked); msg(h.checked ? 'Hover preview on.' : 'Hover preview off.'); };
+$('peek').onmousedown = () => { peek = true; draw(); };
+addEventListener('mouseup', () => { if (peek) { peek = false; draw(); } });
+
+/* ---------- zoom / pan ---------- */
 function applyView() {
   cv.style.width = S.w + 'px'; cv.style.height = S.h + 'px';
   cv.style.transform = `translate(${V.x}px,${V.y}px) scale(${V.k})`;
   cv.style.imageRendering = V.k >= 4 ? 'pixelated' : 'auto';
-  $('zl').textContent = 'Zoom ' + Math.round(V.k * 100) + '%  (wheel; pan: middle-drag or Space+drag)';
+  $('zp').textContent = Math.round(V.k * 100) + '%';
   if (S.pts.length) draw();
 }
 function fit() {
-  autoFit = true;
-  const r = stage.getBoundingClientRect();
-  V.k = Math.min(r.width / S.w, r.height / S.h) * 0.96;
+  autoFit = true; const r = stage.getBoundingClientRect();
+  V.k = Math.min(r.width / S.w, r.height / S.h) * 0.94;
   V.x = (r.width - S.w * V.k) / 2; V.y = (r.height - S.h * V.k) / 2; applyView();
 }
 function zoomAt(f, sx, sy) {
-  autoFit = false;
-  const nk = Math.min(32, Math.max(0.05, V.k * f));
-  const u = (sx - V.x) / V.k, v = (sy - V.y) / V.k;
-  V.k = nk; V.x = sx - u * nk; V.y = sy - v * nk; applyView();
+  autoFit = false; const nk = Math.min(32, Math.max(0.05, V.k * f));
+  const u = (sx - V.x) / V.k, v = (sy - V.y) / V.k; V.k = nk; V.x = sx - u * nk; V.y = sy - v * nk; applyView();
 }
 function zoomCenter(f) { const r = stage.getBoundingClientRect(); zoomAt(f, r.width / 2, r.height / 2); }
 stage.addEventListener('wheel', e => {
-  if (!S.sid) return; e.preventDefault();
-  const r = stage.getBoundingClientRect();
+  if (!S.sid) return; e.preventDefault(); const r = stage.getBoundingClientRect();
   zoomAt(Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX - r.left, e.clientY - r.top);
 }, {passive: false});
 $('zin').onclick = () => S.sid && zoomCenter(1.25);
@@ -93,200 +239,224 @@ $('zout').onclick = () => S.sid && zoomCenter(0.8);
 $('zfit').onclick = () => S.sid && fit();
 $('z100').onclick = () => S.sid && zoomCenter(1 / V.k);
 addEventListener('resize', () => { if (S.sid && autoFit) fit(); });
+const typing = () => /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && document.activeElement.type !== 'checkbox';
 addEventListener('keydown', e => {
-  if (e.code === 'Space' && document.activeElement === document.body) { space = true; cv.style.cursor = 'grab'; e.preventDefault(); }
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && k === 'y') { e.preventDefault(); redo(); return; }
+  if (mod && k === 'o') { e.preventDefault(); $('file').click(); return; }
+  if (typing()) return;
+  if (e.code === 'Space') { space = true; cv.style.cursor = 'grab'; e.preventDefault(); return; }
+  if (!S.sid || mod) return;
+  const map = {w: () => setTool('point'), b: () => setTool('box'), v: () => setTool('move'), h: () => setTool('hand'),
+    f: fit, '0': () => zoomCenter(1 / V.k), '+': () => zoomCenter(1.25), '=': () => zoomCenter(1.25), '-': () => zoomCenter(0.8),
+    '1': () => setView('original'), '2': () => setView('layers'), '3': () => setView('isolate'), '4': () => setView('diff'),
+    enter: () => $('selbar').style.display === 'flex' && $('commit').click(), escape: () => $('clear').click(),
+    '\\': () => { peek = true; draw(); }, delete: () => { const b = document.querySelector('.layer.sel .del'); b && b.click(); }};
+  if (map[k]) { e.preventDefault(); map[k](); }
 });
-addEventListener('keyup', e => { if (e.code === 'Space') { space = false; cv.style.cursor = 'crosshair'; } });
+addEventListener('keyup', e => {
+  if (e.code === 'Space') { space = false; setTool(tool); }
+  if (e.key === '\\') { peek = false; draw(); }
+});
 function startPan(e) { autoFit = false; pan = {mx: e.clientX, my: e.clientY, x: V.x, y: V.y}; cv.style.cursor = 'grabbing'; }
-stage.onmousedown = e => { if (e.target === stage && S.sid) { e.preventDefault(); startPan(e); } };
+stage.onmousedown = e => { if ((e.target === stage || e.target.id === 'empty') && S.sid) { e.preventDefault(); startPan(e); } };
 addEventListener('mousemove', e => {
   if (drag) { drag.l.dx = Math.round(drag.dx + (e.clientX - drag.mx) / V.k); drag.l.dy = Math.round(drag.dy + (e.clientY - drag.my) / V.k); draw(); return; }
   if (boxDrag) { const q = pos(e); boxDrag.x1 = q.x; boxDrag.y1 = q.y; draw(); return; }
-  if (!pan) return; V.x = pan.x + e.clientX - pan.mx; V.y = pan.y + e.clientY - pan.my; applyView(); });
+  if (!pan) return; V.x = pan.x + e.clientX - pan.mx; V.y = pan.y + e.clientY - pan.my; applyView();
+});
 addEventListener('mouseup', () => {
   if (boxDrag) {
     const b = boxDrag; boxDrag = null;
-    if (Math.abs(b.x1 - b.x0) > 4 && Math.abs(b.y1 - b.y0) > 4) {
-      S.box = [Math.min(b.x0, b.x1), Math.min(b.y0, b.y1), Math.max(b.x0, b.x1), Math.max(b.y0, b.y1)];
-      $('view').value = 'original';
-      segment(S.pts, S.box).catch(err => msg(err.message));
-    }
+    if (Math.abs(b.x1 - b.x0) > 4 && Math.abs(b.y1 - b.y0) > 4)
+      selEdit('box select', () => { S.box = [Math.min(b.x0, b.x1), Math.min(b.y0, b.y1), Math.max(b.x0, b.x1), Math.max(b.y0, b.y1)]; });
     draw();
   }
-  if (drag) { drag = null; syncLayout(); } if (pan) { pan = null; cv.style.cursor = space ? 'grab' : 'crosshair'; } });
-const msg = t => $('msg').textContent = t;
-const warn = t => { $('warn').textContent = t || ''; $('warn').style.display = t ? 'block' : 'none'; };
-const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
-const post = (u, b) => fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b)})
-  .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t); }));
-const pos = e => { const b = cv.getBoundingClientRect(); return {x: (e.clientX - b.left) * cv.width / b.width, y: (e.clientY - b.top) * cv.height / b.height}; };
-
-$('file').onchange = async e => {
-  const f = e.target.files[0]; if (!f) return;
-  const fd = new FormData(); fd.append('file', f);
-  msg('Uploading and computing image embedding...');
-  const r = await (await fetch('/api/upload', {method: 'POST', body: fd})).json();
-  S = {sid: r.sid, w: r.w, h: r.h, pts: [], box: null, ov: null, layers: [], sel: null, bg: null, diff: null, img: null};
-  S.img = await load('/api/original/' + r.sid);
-  cv.width = r.w; cv.height = r.h; fit();
-  warn(r.lama ? '' : 'LaMa is not installed: backgrounds will be flat blurry blobs. Run: python -m pip install simple-lama-inpainting, then restart the server.'); msg('Ready (embedding took ' + r.embed_s + 's). Click an object.');
-  draw(); renderLayers();
-};
-
-async function segment(pts, box) {
-  const my = ++seq;
-  const r = await post('/api/segment', {sid: S.sid, points: pts, box: box || null, zoom: $('zoomsam').checked});
-  if (my !== seq) return;
-  const m = await load(r.mask);
-  const o = document.createElement('canvas'); o.width = S.w; o.height = S.h;
-  const c = o.getContext('2d'); c.drawImage(m, 0, 0);
-  const d = c.getImageData(0, 0, S.w, S.h);
-  for (let i = 0; i < d.data.length; i += 4) {
-    const on = d.data[i] > 127;
-    d.data[i] = 255; d.data[i + 1] = 60; d.data[i + 2] = 60; d.data[i + 3] = on ? 120 : 0;
+  if (drag) {
+    const d = drag, l = d.l, a = {dx: l.dx, dy: l.dy}; drag = null; syncLayout();
+    if (a.dx !== d.dx || a.dy !== d.dy) pushH({label: 'move layer', layers: [l],
+      undo: () => { l.dx = d.dx; l.dy = d.dy; draw(); return syncLayout(); }, redo: () => { l.dx = a.dx; l.dy = a.dy; draw(); return syncLayout(); }});
   }
-  c.putImageData(d, 0, 0); S.ov = o; draw();
-}
+  if (pan) { pan = null; setTool(tool); if (space) cv.style.cursor = 'grab'; }
+});
 
+/* ---------- open image ---------- */
+async function openFile(f) {
+  if (!f) return;
+  const fd = new FormData(); fd.append('file', f); msg('Uploading and computing image embedding...');
+  await work(async () => {
+    const r = await (await fetch('/api/upload', {method: 'POST', body: fd})).json();
+    S = {sid: r.sid, w: r.w, h: r.h, pts: [], box: null, ov: null, layers: [], sel: null, bg: null, diff: null, img: null};
+    H.u = []; H.r = []; hist(); S.img = await load('/api/original/' + r.sid);
+    cv.width = r.w; cv.height = r.h; $('empty').style.display = 'none'; fit();
+    warn(r.lama ? '' : 'LaMa is not installed: backgrounds will be flat blurry blobs. Run: python -m pip install simple-lama-inpainting, then restart the server.');
+    msg('Ready (embedding took ' + r.embed_s + 's). Click an object.');
+    setView('original'); renderLayers(); selUI();
+  });
+}
+$('file').onchange = e => { openFile(e.target.files[0]); e.target.value = ''; };
+$('open').onclick = $('drop').onclick = () => $('file').click();
+stage.ondragover = e => { e.preventDefault(); stage.classList.add('dz'); };
+stage.ondragleave = () => stage.classList.remove('dz');
+stage.ondrop = e => { e.preventDefault(); stage.classList.remove('dz'); openFile(e.dataTransfer.files[0]); };
+
+/* ---------- segmentation ---------- */
+async function segment(pts, box, quiet) {
+  const my = ++seq; if (!quiet) busy(1);
+  try {
+    const r = await post('/api/segment', {sid: S.sid, points: pts, box: box || null, zoom: $('zoomsam').checked});
+    if (my !== seq) return;
+    const m = await load(r.mask), o = document.createElement('canvas'); o.width = S.w; o.height = S.h;
+    const c = o.getContext('2d'); c.drawImage(m, 0, 0);
+    const d = c.getImageData(0, 0, S.w, S.h);
+    for (let i = 0; i < d.data.length; i += 4) {
+      const on = d.data[i] > 127; d.data[i] = 77; d.data[i + 1] = 163; d.data[i + 2] = 255; d.data[i + 3] = on ? 120 : 0;
+    }
+    c.putImageData(d, 0, 0); S.ov = o; draw(); selUI();
+  } finally { if (!quiet) busy(-1); }
+}
 cv.onmousedown = e => {
   if (!S.sid) return; e.preventDefault();
   if (document.activeElement) document.activeElement.blur();
-  if (e.button === 1 || space) return startPan(e);
-  if ($('move').checked && S.sel != null && ['layers', 'isolate'].includes($('view').value)) {
+  if (e.button === 1 || space || tool === 'hand') return startPan(e);
+  if (tool === 'move' && S.sel != null && ['layers', 'isolate'].includes($('view').value)) {
     const l = S.layers.find(x => x.id === S.sel);
     if (l) { drag = {mx: e.clientX, my: e.clientY, dx: l.dx, dy: l.dy, l}; return; }
   }
-  if (e.shiftKey && e.button === 0) { const q = pos(e); boxDrag = {x0: q.x, y0: q.y, x1: q.x, y1: q.y}; return; }
-  const p = pos(e); S.pts.push({x: p.x, y: p.y, l: e.button === 2 ? 0 : 1});
-  $('view').value = 'original';
-  segment(S.pts, S.box).catch(err => msg(err.message));
+  if (tool === 'move') return msg('Select a layer in the list, then drag it (Layers or Isolate view).');
+  if ((e.shiftKey || tool === 'box') && e.button === 0) { const q = pos(e); boxDrag = {x0: q.x, y0: q.y, x1: q.x, y1: q.y}; return; }
+  const p = pos(e); selEdit(e.button === 2 ? 'remove point' : 'add point', () => S.pts.push({x: p.x, y: p.y, l: e.button === 2 ? 0 : 1}));
 };
 cv.oncontextmenu = e => false;
 let tHover = 0;
 cv.onmousemove = e => {
-  if (!$('hover').checked || S.pts.length || !S.sid || pan || space) return;
+  if (S.sid) { const p = pos(e); $('xy').textContent = Math.round(p.x) + ', ' + Math.round(p.y) + ' px  |  ' + S.w + '\u00D7' + S.h; }
+  if (!$('hover').checked || S.pts.length || !S.sid || pan || space || tool !== 'point') return;
   const n = Date.now(); if (n - tHover < 150) return; tHover = n;
-  const p = pos(e); segment([{x: p.x, y: p.y, l: 1}]).catch(() => {});
+  const p = pos(e); segment([{x: p.x, y: p.y, l: 1}], null, true).catch(() => {});
 };
-$('clear').onclick = () => { S.pts = []; S.box = null; S.ov = null; seq++; draw(); };
+$('clear').onclick = () => { if (S.pts.length || S.box) selEdit('clear selection', () => { S.pts = []; S.box = null; }); else { S.ov = null; seq++; draw(); selUI(); } };
 
-$('commit').onclick = async () => {
-  try {
-    msg('Refining edges and finding shadow (can take several seconds)...');
-    const r = await post('/api/commit', {sid: S.sid, name: $('name').value || 'object', kind: $('kind').value, clean: $('clean').checked});
-    const [ob, sh] = await Promise.all([load(r.object), load(r.shadow)]);
-    S.layers.push({id: r.id, name: r.name, kind: r.kind, q: r.q, vis: true, dx: 0, dy: 0, ob, sh});
-    S.sel = r.id; S.pts = []; S.box = null; S.ov = null; S.bg = null;
-    renderLayers(); draw();
-    msg(r.kind === 'spray' ? 'Spray layer added. Press Build background: its alpha is computed from the clean plate.' : 'Layer added (' + r.q.area + '% of image, ' + r.q.pieces + ' piece(s), ' + r.q.holes + ' hole(s)). Check isolate view on white and black.');
-  } catch (err) { msg(err.message); }
-};
-
-$('setshadow').onclick = async () => {
+/* ---------- layers ---------- */
+async function doCommit(p) {
+  const r = await post('/api/commit', {sid: S.sid, name: p.name, kind: p.kind, clean: p.clean});
+  const [ob, sh] = await Promise.all([load(r.object), load(r.shadow)]);
+  return {r, ob, sh};
+}
+function attach(L, c) {
+  Object.assign(L, {id: c.r.id, name: c.r.name, kind: c.r.kind, q: c.r.q, ob: c.ob, sh: c.sh, dx: 0, dy: 0, vis: true});
+  if (!S.layers.includes(L)) S.layers.push(L);
+  S.sel = L.id; S.pts = []; S.box = null; S.ov = null; S.bg = null; renderLayers(); draw(); selUI();
+}
+$('commit').onclick = () => work(async () => {
+  msg('Refining edges and finding shadow (can take several seconds)...');
+  const p = {name: $('name').value || 'object', kind: $('kind').value, clean: $('clean').checked}, sel = snap(), prev = S.sel;
+  const c = await doCommit(p), L = {}; attach(L, c); $('name').value = '';
+  pushH({label: 'add layer', layers: [L],
+    undo: async () => { await fetch(`/api/layer/${S.sid}/${L.id}`, {method: 'DELETE'}); S.layers = S.layers.filter(x => x !== L);
+      S.sel = prev; S.bg = null; renderLayers(); await applySel(sel); },
+    redo: async () => { await applySel(sel); attach(L, await doCommit(p)); }});
+  msg(c.r.kind === 'spray' ? 'Spray layer added. Press Build background: its alpha is computed from the clean plate.' : 'Layer added (' + c.r.q.area + '% of image, ' + c.r.q.pieces + ' piece(s), ' + c.r.q.holes + ' hole(s)). Check isolate view on white and black.');
+});
+$('setshadow').onclick = () => work(async () => {
   if (S.sel == null) return msg('Select a layer first.');
-  try {
-    const r = await post('/api/set_shadow', {sid: S.sid, lid: S.sel});
-    S.layers.find(l => l.id === S.sel).sh = await load(r.shadow);
-    S.pts = []; S.ov = null; S.bg = null; $('view').value = 'isolate'; draw(); msg('Shadow updated.');
-  } catch (err) { msg(err.message); }
-};
-
-$('bgbtn').onclick = async () => {
+  const r = await post('/api/set_shadow', {sid: S.sid, lid: S.sel});
+  S.layers.find(l => l.id === S.sel).sh = await load(r.shadow);
+  S.pts = []; S.ov = null; S.bg = null; setView('isolate'); renderLayers(); selUI(); msg('Shadow updated (not undoable).');
+});
+$('bgbtn').onclick = () => work(async () => {
   const sd = $('engine').value === 'sd';
   msg(sd ? 'Generating background with Stable Diffusion (first run downloads about 4 GB; CPU can take minutes)...' : 'Inpainting background...');
-  try {
-    const r = await post('/api/background', {sid: S.sid, engine: $('engine').value, prompt: $('prompt').value});
-    S.bg = await load(r.url); await reloadSpray(); warn(r.note || ''); $('view').value = 'layers'; draw(); msg(r.note ? 'Background built with warnings (see red box).' : 'Background built.');
-  } catch (err) { msg(err.message); }
-};
-
-$('check').onclick = async () => {
-  msg('Checking...');
-  const r = await (await fetch('/api/check/' + S.sid)).json();
-  S.diff = await load(r.diff); await reloadSpray(); warn(r.note || '');
+  const r = await post('/api/background', {sid: S.sid, engine: $('engine').value, prompt: $('prompt').value});
+  S.bg = await load(r.url); await reloadSpray(); warn(r.note || ''); setView('layers'); msg(r.note ? 'Background built with warnings (see red box).' : 'Background built.');
+});
+$('check').onclick = () => work(async () => {
+  msg('Checking...'); const r = await (await fetch('/api/check/' + S.sid)).json();
+  S.diff = await load(r.diff); await reloadSpray(); warn(r.note || ''); setView('diff');
   msg('Mean error ' + r.mean + '/255, 99th percentile ' + r.p99 + '/255. Diff view is amplified 8x.');
-};
-$('export').onclick = () => { location.href = '/api/export/' + S.sid; };
-$('complete').onclick = async () => {
+});
+$('export').onclick = () => { if (S.sid) location.href = '/api/export/' + S.sid; };
+$('complete').onclick = () => work(async () => {
   if (S.sel == null) return msg('Select the covered layer (e.g. the car) first.');
-  const l = S.layers.find(x => x.id === S.sel);
-  msg('Completing hidden part...');
-  try {
-    await syncLayout();
-    const r = await post('/api/complete', {sid: S.sid, lid: S.sel, engine: $('engine').value, prompt: $('prompt').value});
-    l.ob = await load(r.object); S.bg = null; $('view').value = 'isolate'; draw(); msg(r.note);
-  } catch (err) { msg(err.message); }
-};
-$('view').onchange = draw;
-$('bgsel').onchange = draw;
-$('showsh').onchange = draw;
+  const l = S.layers.find(x => x.id === S.sel); msg('Completing hidden part...');
+  await syncLayout();
+  const r = await post('/api/complete', {sid: S.sid, lid: S.sel, engine: $('engine').value, prompt: $('prompt').value});
+  l.ob = await load(r.object); S.bg = null; setView('isolate'); renderLayers(); msg(r.note + ' (not undoable)');
+});
+$('view').onchange = draw; $('bgsel').onchange = draw; $('showsh').onchange = draw;
 
+/* ---------- drawing ---------- */
 function checker() {
   const m = $('bgsel').value;
   if (m !== 'checker') { ctx.fillStyle = m === 'white' ? '#fff' : '#000'; ctx.fillRect(0, 0, S.w, S.h); return; }
   const s = 16;
-  for (let y = 0; y < S.h; y += s) for (let x = 0; x < S.w; x += s) {
-    ctx.fillStyle = ((x + y) / s) % 2 ? '#bbb' : '#fff'; ctx.fillRect(x, y, s, s);
-  }
+  for (let y = 0; y < S.h; y += s) for (let x = 0; x < S.w; x += s) { ctx.fillStyle = ((x + y) / s) % 2 ? '#bbb' : '#fff'; ctx.fillRect(x, y, s, s); }
 }
 function draw() {
   if (!S.img) return;
   ctx.clearRect(0, 0, S.w, S.h);
-  const v = $('view').value;
-  if (v === 'original') {
-    ctx.drawImage(S.img, 0, 0);
-    if (S.ov) ctx.drawImage(S.ov, 0, 0);
-    const bx = boxDrag ? [boxDrag.x0, boxDrag.y0, boxDrag.x1, boxDrag.y1] : S.box, kz = Math.max(V.k, 0.25);
+  const v = peek ? 'peek' : $('view').value, kz = Math.max(V.k, 0.25);
+  if (v === 'peek') ctx.drawImage(S.img, 0, 0);
+  else if (v === 'original') {
+    ctx.drawImage(S.img, 0, 0); if (S.ov) ctx.drawImage(S.ov, 0, 0);
+    const bx = boxDrag ? [boxDrag.x0, boxDrag.y0, boxDrag.x1, boxDrag.y1] : S.box;
     if (bx) { ctx.strokeStyle = '#4da3ff'; ctx.lineWidth = 2 / kz; ctx.setLineDash([6 / kz, 4 / kz]);
       ctx.strokeRect(Math.min(bx[0], bx[2]), Math.min(bx[1], bx[3]), Math.abs(bx[2] - bx[0]), Math.abs(bx[3] - bx[1])); ctx.setLineDash([]); }
-    S.pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / Math.max(V.k, 0.25), 0, 7); ctx.fillStyle = p.l ? '#0f0' : '#f00'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 / Math.max(V.k, 0.25); ctx.stroke(); });
+    S.pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6 / kz, 0, 7); ctx.fillStyle = p.l ? '#0f0' : '#f00'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2 / kz; ctx.stroke(); });
   } else if (v === 'layers') {
     checker(); if (S.bg) ctx.drawImage(S.bg, 0, 0);
     S.layers.filter(l => l.vis).forEach(l => { ctx.drawImage(l.sh, l.dx, l.dy); ctx.drawImage(l.ob, l.dx, l.dy); });
   } else if (v === 'isolate') {
     checker(); const l = S.layers.find(l => l.id === S.sel);
     if (l) { if ($('showsh').checked) ctx.drawImage(l.sh, l.dx, l.dy); ctx.drawImage(l.ob, l.dx, l.dy); }
-  } else if (v === 'diff' && S.diff) ctx.drawImage(S.diff, 0, 0);
+  } else if (v === 'diff') { if (S.diff) ctx.drawImage(S.diff, 0, 0); else { checker(); msg('No diff yet: press Check recomposition.'); } }
 }
 function syncLayout() {
   if (!S.sid) return Promise.resolve();
   return post('/api/layout', {sid: S.sid, layers: S.layers.map(l => ({id: l.id, dx: l.dx, dy: l.dy, vis: l.vis}))}).catch(() => {});
 }
-function moveLayer(id, dir) {
-  const i = S.layers.findIndex(l => l.id === id), j = i + dir;
-  if (j < 0 || j >= S.layers.length) return;
-  [S.layers[i], S.layers[j]] = [S.layers[j], S.layers[i]];
-  renderLayers(); draw(); syncLayout();
+function swapLayers(a, b) {
+  const i = S.layers.indexOf(a), j = S.layers.indexOf(b); if (i < 0 || j < 0) return;
+  [S.layers[i], S.layers[j]] = [S.layers[j], S.layers[i]]; renderLayers(); draw(); return syncLayout();
 }
-const mkBtn = t => { const b = document.createElement('button'); b.textContent = t; b.style.width = 'auto'; return b; };
+function moveLayer(l, dir) {
+  const o = S.layers[S.layers.indexOf(l) + dir]; if (!o) return;
+  swapLayers(l, o); pushH({label: 'reorder layers', layers: [l, o], undo: () => swapLayers(l, o), redo: () => swapLayers(l, o)});
+}
+function setVis(l, v) { l.vis = v; renderLayers(); draw(); return syncLayout(); }
 async function reloadSpray() {
   for (const l of S.layers.filter(x => x.kind === 'spray')) l.ob = await load(`/api/layer/${S.sid}/${l.id}/object?t=${Date.now()}`);
   renderLayers(); draw();
 }
 function thumb(l) {
-  const c = document.createElement('canvas'), w = 44, h = Math.max(1, Math.round(44 * S.h / S.w));
-  c.width = w; c.height = h; c.style.cssText = 'background:#777;flex:none;width:44px';
-  c.getContext('2d').drawImage(l.ob, 0, 0, w, h); return c;
+  const c = document.createElement('canvas'), w = 40, h = Math.max(1, Math.round(40 * S.h / S.w));
+  c.width = w; c.height = h; c.className = 'th'; c.getContext('2d').drawImage(l.ob, 0, 0, w, h); return c;
+}
+function ib(name, title, fn, cls) {
+  const b = document.createElement('button'); b.className = 'ib ' + (cls || ''); b.title = title; b.innerHTML = icon(name);
+  b.onclick = e => { e.stopPropagation(); fn(b); }; return b;
 }
 function renderLayers() {
-  const box = $('layers'); box.innerHTML = '<h3>Layers</h3><div style="font-size:11px;color:#888">top of stack first</div>';
+  const box = $('layers'); box.innerHTML = ''; $('cnt').textContent = S.layers.length;
+  if (!S.layers.length) box.innerHTML = "<div class='none'>No layers yet.<br>Click an object, then Add layer.</div>";
   [...S.layers].reverse().forEach(l => {
-    const d = document.createElement('div'); d.className = 'layer' + (l.id === S.sel ? ' sel' : '');
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = l.vis;
-    const sp = document.createElement('span'); sp.append(document.createTextNode(l.name + (l.kind === 'spray' ? ' (spray)' : '')));
-    if (l.q) { const sm = document.createElement('div'); sm.style.cssText = 'font-size:10px;color:#888';
-      sm.textContent = l.q.area + '% | ' + l.q.pieces + ' pc | ' + l.q.holes + ' holes'; sp.append(sm); }
-    const up = mkBtn('\u25B2'), dn = mkBtn('\u25BC'), del = mkBtn('x');
-    d.append(cb, thumb(l), sp, up, dn, del);
-    d.onclick = () => { S.sel = l.id; renderLayers(); draw(); };
-    cb.onclick = e => { e.stopPropagation(); l.vis = cb.checked; draw(); syncLayout(); };
-    up.onclick = e => { e.stopPropagation(); moveLayer(l.id, 1); };
-    dn.onclick = e => { e.stopPropagation(); moveLayer(l.id, -1); };
-    del.onclick = async e => {
-      e.stopPropagation(); await fetch(`/api/layer/${S.sid}/${l.id}`, {method: 'DELETE'});
-      S.layers = S.layers.filter(x => x.id !== l.id); S.bg = null; if (S.sel === l.id) S.sel = null; renderLayers(); draw();
-    };
-    box.appendChild(d);
+    const d = document.createElement('div'); d.className = 'layer' + (l.id === S.sel ? ' sel' : '') + (l.vis ? '' : ' off');
+    const eye = ib(l.vis ? 'eye' : 'eyeo', l.vis ? 'Hide' : 'Show', () => {
+      const v = !l.vis; setVis(l, v); pushH({label: 'toggle visibility', layers: [l], undo: () => setVis(l, !v), redo: () => setVis(l, v)}); });
+    const nm = document.createElement('div'); nm.className = 'nm';
+    const t = document.createElement('b'); t.textContent = l.name + (l.kind === 'spray' ? ' (spray)' : ''); nm.append(t);
+    if (l.q) { const s = document.createElement('small'), bad = l.q.pieces > 1 || l.q.holes > 0;
+      s.textContent = l.q.area + '%  \u00B7  ' + l.q.pieces + ' pc  \u00B7  ' + l.q.holes + ' holes'; if (bad) s.className = 'w'; nm.append(s); }
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const del = ib('tr', 'Delete layer (cannot be undone)', b => {
+      if (!b.classList.contains('arm')) { b.classList.add('arm'); b.title = 'Click again to delete'; setTimeout(() => { b.classList.remove('arm'); b.title = 'Delete layer (cannot be undone)'; }, 2500); return; }
+      fetch(`/api/layer/${S.sid}/${l.id}`, {method: 'DELETE'}).then(() => {
+        S.layers = S.layers.filter(x => x !== l); S.bg = null; if (S.sel === l.id) S.sel = null; dropHist(l); renderLayers(); draw(); });
+    }, 'del');
+    acts.append(ib('up', 'Bring forward', () => moveLayer(l, 1)), ib('dn', 'Send backward', () => moveLayer(l, -1)), del);
+    d.append(eye, thumb(l), nm, acts); d.onclick = () => { S.sel = l.id; renderLayers(); draw(); }; box.appendChild(d);
   });
 }
+setTool('point'); setView('original'); setBg('checker'); hist();
 </script></body></html>
